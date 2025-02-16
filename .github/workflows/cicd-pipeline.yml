@@ -1,0 +1,71 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run ESLint
+        run: |
+          npm install
+          npm run lint
+
+  security_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run SAST Scan
+        run: |
+          npm install -g snyk
+          snyk test
+
+  build_and_push:
+    needs: [lint, security_scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ECR_REPO_URL
+
+      - name: Build Docker Image
+        run: |
+          docker build -t YOUR_ECR_REPO_URL:latest .
+
+      - name: Push Docker Image
+        run: |
+          docker push YOUR_ECR_REPO_URL:latest
+
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+
+      - name: Apply Terraform
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster dummy-api-cluster --service dummy-api-blue --force-new-deployment
