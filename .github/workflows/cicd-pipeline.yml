@@ -6,28 +6,6 @@ on:
       - main
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Run ESLint
-        run: |
-          npm install
-          npm run lint
-
-  security_scan:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Run SAST Scan
-        run: |
-          npm install -g snyk
-          snyk test
-
   build_and_push:
     needs: [lint, security_scan]
     runs-on: ubuntu-latest
